@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wiki Network Explorer – Publish Candidate RC13</title>
+<style>
+:root{
+  --bg: rgb(255,238,170);
+  --panel: rgb(187,223,218);
+  --ink:#111;
+  --line:#333;
+  --white:#fff;
+}
+*{box-sizing:border-box}
+html,body{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  overflow:hidden;
+}
+#topbar{
+  position:fixed;
+  z-index:50;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  background:#fff;
+  border:1px solid #333;
+  border-radius:12px;
+  padding:8px 10px;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+#topbar button,#topbar input[type=search]{
+  font-size:14px;
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid #333;
+  background:#fff;
+  outline:none;
+}
+#topbar button{cursor:pointer}
+#topbar button:hover{background:#f5f5f5}
+#txtSearch{min-width:230px}
+#lblCount{align-self:center;font-size:12px;color:#333;min-width:90px}
+#graphWrap{position:fixed;inset:0}
+svg{width:100%;height:100%;display:block}
+.tooltip{
+  position:fixed;
+  z-index:70;
+  max-width:280px;
+  padding:6px 8px;
+  font-size:12px;
+  background:#fff;
+  border:1px solid #333;
+  border-radius:8px;
+  pointer-events:none;
+  display:none;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+#sidePanel{
+  position:fixed;
+  top:0;
+  right:0;
+  height:100vh;
+  width:380px;
+  background:var(--panel);
+  border-left:1px solid #e7b7a8;
+  z-index:60;
+  box-shadow:-6px 0 18px rgba(0,0,0,.1);
+  display:none;
+  overflow:auto;
+  padding:14px;
+}
+#sidePanel .close{
+  position:absolute;
+  top:8px;
+  right:8px;
+  background:#fff;
+  border:1px solid #333;
+  border-radius:6px;
+  padding:2px 8px;
+  cursor:pointer;
+}
+#sidePanel h3{margin:8px 32px 8px 0;font-size:18px;line-height:1.2}
+#sidePanel p{font-size:13px;line-height:1.45}
+.preview-img{
+  width:100%;
+  max-height:180px;
+  object-fit:cover;
+  border:1px solid #333;
+  border-radius:10px;
+  background:#fff;
+  margin:8px 0 10px;
+}
+.panel-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:10px 0 12px;
+}
+.panel-actions button,.panel-actions a{
+  display:inline-block;
+  font-size:13px;
+  text-decoration:none;
+  color:#111;
+  padding:7px 10px;
+  background:#fff;
+  border:1px solid #333;
+  border-radius:10px;
+  cursor:pointer;
+}
+.panel-actions button:hover,.panel-actions a:hover{background:#f7f1dc}
+.panel-actions .wiki-main{
+  width:100%;
+  text-align:center;
+  font-weight:800;
+  font-size:15px;
+  padding:11px 12px;
+  border:2px solid #111;
+  background:rgb(255,238,170);
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+.panel-actions .wiki-main:hover{background:#fff2a8}
+.panel-note{
+  font-size:12px;
+  line-height:1.35;
+  background:rgba(255,255,255,.55);
+  border:1px solid rgba(0,0,0,.25);
+  border-radius:10px;
+  padding:8px 10px;
+  margin:8px 0 10px;
+}
+.linkList{margin-top:12px}
+.linkList h4{font-size:13px;margin:10px 0 6px}
+.linkList a{
+  display:block;
+  margin:3px 0;
+  text-decoration:none;
+  color:#0645ad;
+  word-break:break-word;
+  font-size:13px;
+}
+.linkList a.visibleInGraph{
+  font-weight:750;
+  color:#0645ad;
+}
+.linkList a.visibleInGraph::before{
+  content:"● ";
+  color:rgb(68,43,120);
+  font-weight:900;
+}
+.linkList a:not(.visibleInGraph)::before{
+  content:"○ ";
+  color:rgba(68,43,120,.35);
+}
+.linkList a:hover{
+  background:rgba(255,255,255,.45);
+  border-radius:6px;
+}
+#help{
+  position:fixed;
+  left:12px;
+  bottom:12px;
+  z-index:45;
+  background:#fff;
+  border:1px solid #333;
+  border-radius:10px;
+  padding:8px 10px;
+  max-width:360px;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+  font-size:12px;
+  line-height:1.35;
+}
+.node circle{
+  stroke:#1d1d1d;
+  stroke-width:1.4px;
+  filter: drop-shadow(0px 1px 1px rgba(0,0,0,.25));
+}
+.node.root circle{
+  stroke-width:2.4px;
+}
+.node.expanded circle{
+  stroke-width:2.3px;
+}
+.node text{
+  font-size:14px;
+  paint-order:stroke;
+  stroke:rgba(255,255,255,.86);
+  stroke-width:4px;
+  stroke-linejoin:round;
+  fill:#111;
+  pointer-events:none;
+  user-select:none;
+}
+.node.secondary text{font-size:12px}
+.node.dragging circle.mainCircle{stroke-width:3px}
+@keyframes selectedPulse{
+  0%{
+    stroke-width:5px;
+    opacity:.35;
+    transform:scale(1);
+  }
+  50%{
+    stroke-width:10px;
+    opacity:1;
+    transform:scale(1.08);
+  }
+  100%{
+    stroke-width:5px;
+    opacity:.35;
+    transform:scale(1);
+  }
+}
+.node .halo{
+  display:none;
+  fill:none;
+  stroke:rgb(68,43,120);
+  stroke-width:8px;
+  opacity:.95;
+  pointer-events:none;
+  filter: drop-shadow(0px 0px 8px rgba(68,43,120,.85));
+}
+.node.selectedHalo .halo{
+  display:block;
+  animation:selectedPulse 1.25s ease-in-out infinite;
+}
+.node.selectedHalo circle.mainCircle{
+  stroke:#111;
+  stroke-width:2.8px;
+}
+.link{
+  fill:none;
+  stroke-linecap:round;
+  opacity:.74;
+}
+.link.primary{
+  stroke-width:2.4px;
+}
+.link.cross{
+  stroke-width:.85px;
+  stroke-dasharray:4 9;
+  opacity:.24;
+}
+.link.dim{opacity:.10}
+.node.dim{opacity:.18}
+.node.selectedHalo text{
+  font-size:22px !important;
+  font-weight:850;
+}
+.node.neighborPrimary text{
+  font-size:17px !important;
+  font-weight:750;
+}
+.node.neighborCross text{
+  font-size:15px !important;
+  font-weight:650;
+}
+.link.activePrimary{
+  stroke:rgb(68,43,120) !important;
+  stroke-width:3.4px !important;
+  opacity:.96 !important;
+}
+.link.activeCross{
+  stroke:rgb(68,43,120) !important;
+  stroke-width:2.25px !important;
+  opacity:.86 !important;
+}
+.node.focused circle.mainCircle{
+  stroke:#000;
+  stroke-width:3px;
+}
+#status{
+  position:fixed;
+  left:12px;
+  top:12px;
+  z-index:40;
+  background:#fff;
+  border:1px solid #333;
+  border-radius:10px;
+  padding:6px 9px;
+  font-size:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+  display:none;
+}
+@media (max-width: 760px){
+  #sidePanel{width:92vw}
+  #topbar{left:8px;right:8px;transform:none;justify-content:center}
+  #txtSearch{min-width:160px}
+  #help{display:none}
+}
+</style>
+<script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
+</head>
+<body>
+<div id="topbar" role="toolbar" aria-label="Wiki Network Explorer Bedienung">
+  <button id="btnFit" title="Ansicht automatisch einpassen">Fit</button>
+  <input id="txtSearch" placeholder="Wikipedia-Artikel suchen..." type="search"/>
+  <button id="btnSearch">Suchen</button>
+  <button id="btnExpand" title="Ausgewählten Artikel im Netzwerk erweitern">Artikel erweitern</button>
+  <button id="btnShowAll" title="Alle Knoten und Linien wieder anzeigen">Alles anzeigen</button>
+  <span id="lblCount"></span>
+</div>
+
+<div id="status"></div>
+<div id="graphWrap"><svg id="graph" aria-label="Wikipedia Netzwerkgraph"></svg></div>
+<div class="tooltip" id="tooltip"></div>
+
+<div id="sidePanel">
+  <button class="close" id="btnClosePanel" title="Schließen">×</button>
+  <div id="panelContent"></div>
+</div>
+
+<div id="help">
+  <b>Bedienung:</b> Einfachklick wählt einen Knoten aus. Der violette Ring bleibt aktiv, bis du etwas anderes wählst. Gestrichelte Linien zeigen Querverbindungen zwischen Artikeln. Blaue Links mit ● sind bereits im Graph sichtbar. „Alles anzeigen“ hebt die Hervorhebung wieder auf.
+</div>
+
+<script>
+const API = "https://de.wikipedia.org/w/api.php";
+const SUMMARY = "https://de.wikipedia.org/api/rest_v1/page/summary/";
+const WIKI_BASE = "https://de.wikipedia.org/wiki/";
+
+const userPalette = [
+  "rgb(241,187,196)", "rgb(255,238,170)", "rgb(186,168,138)",
+  "rgb(223,84,52)", "rgb(180,217,194)", "rgb(108,139,102)",
+  "rgb(164,207,216)", "rgb(174,169,200)", "rgb(153,156,144)"
+];
+
+const expandedPalette = [
+  "#d84f34", "#6c8b66", "#a4cfd8", "#f1bbc4", "#aea9c8",
+  "#baa88a", "#ffd95d", "#7eb7a5", "#c16a55", "#8e86bd",
+  "#5e9aaa", "#d99aa4", "#8c7b60", "#6e9c75", "#e0b45e"
+];
+
+const keywordColors = [
+  {rx:/chem|atom|molekül|element|säure|base|reaktion|organisch|anorganisch|stoff|polymer|katalyse/i, color:"#d84f34"},
+  {rx:/bio|gen|dna|rna|protein|zelle|enzym|organismus|medizin|pharma/i, color:"#6c8b66"},
+  {rx:/phys|quant|energie|kraft|elektr|licht|thermo|materie/i, color:"#5e9aaa"},
+  {rx:/mathe|zahl|statistik|algebra|geometrie|funktion/i, color:"#8e86bd"},
+  {rx:/geschichte|krieg|reich|jahr|stadt|hamburg|person|kultur/i, color:"#baa88a"},
+  {rx:/technik|computer|informatik|software|daten|netz|ki|algorithm/i, color:"#a4cfd8"},
+  {rx:/kunst|musik|literatur|film|theater|malerei/i, color:"#f1bbc4"}
+];
+
+const svg = d3.select("#graph");
+const g = svg.append("g");
+const linkLayer = g.append("g").attr("class","links");
+const nodeLayer = g.append("g").attr("class","nodes");
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+let nodes = [];
+let links = [];
+let nodeMap = new Map();
+let selected = null;
+let crossMode = 'all';
+let simulation = null;
+let linkCache = new Map();
+let summaryCache = new Map();
+
+const tooltip = document.getElementById("tooltip");
+const sidePanel = document.getElementById("sidePanel");
+const panelContent = document.getElementById("panelContent");
+const lblCount = document.getElementById("lblCount");
+const statusBox = document.getElementById("status");
+
+const zoom = d3.zoom()
+  .scaleExtent([0.12, 3.4])
+  .on("zoom", (event) => g.attr("transform", event.transform));
+svg.call(zoom);
+
+function setStatus(msg, timeout=1800){
+  statusBox.textContent = msg;
+  statusBox.style.display = "block";
+  clearTimeout(setStatus.t);
+  setStatus.t = setTimeout(()=>statusBox.style.display="none", timeout);
+}
+
+function normTitle(t){
+  return (t || "").trim().replace(/_/g," ");
+}
+function idFromTitle(t){
+  return normTitle(t).toLowerCase();
+}
+function wikiUrl(t){
+  return WIKI_BASE + encodeURIComponent(normTitle(t).replaceAll(" ","_"));
+}
+function hashColor(title){
+  const s = normTitle(title);
+  for(const k of keywordColors){ if(k.rx.test(s)) return k.color; }
+  let h = 0;
+  for(let i=0;i<s.length;i++) h = ((h<<5)-h) + s.charCodeAt(i);
+  return expandedPalette[Math.abs(h) % expandedPalette.length];
+}
+function edgeColor(edge){
+  if(edge.type === "cross"){
+    const s = nodeMap.get(edge.source.id || edge.source);
+    const t = nodeMap.get(edge.target.id || edge.target);
+    return mixColors((s?.color || "#999"), (t?.color || "#999"), .52);
+  }
+  const t = nodeMap.get(edge.target.id || edge.target);
+  return t?.color || "#888";
+}
+function mixColors(c1,c2,w=.5){
+  function parse(c){
+    if(c.startsWith("rgb")){
+      const m = c.match(/\d+/g).map(Number);
+      return m.slice(0,3);
+    }
+    const x = c.replace("#","");
+    return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16)];
+  }
+  const a=parse(c1), b=parse(c2);
+  const r = Math.round(a[0]*(1-w)+b[0]*w);
+  const g = Math.round(a[1]*(1-w)+b[1]*w);
+  const bl = Math.round(a[2]*(1-w)+b[2]*w);
+  return `rgb(${r},${g},${bl})`;
+}
+
+async function fetchLinks(title){
+  title = normTitle(title);
+  if(linkCache.has(title)) return linkCache.get(title);
+  const params = new URLSearchParams({
+    action:"query", format:"json", origin:"*",
+    prop:"links", titles:title, plnamespace:"0", pllimit:"max", redirects:"1"
+  });
+  let all = [];
+  let cont = "";
+  for(let round=0; round<5; round++){
+    const url = API + "?" + params.toString() + (cont ? "&plcontinue="+encodeURIComponent(cont) : "");
+    const data = await fetch(url).then(r=>r.json());
+    const pages = data.query?.pages || {};
+    for(const p of Object.values(pages)){
+      if(p.links) all.push(...p.links.map(x=>x.title));
+    }
+    cont = data.continue?.plcontinue || "";
+    if(!cont) break;
+  }
+  all = [...new Set(all)]
+    .filter(t => !/^(Wikipedia:|Datei:|Hilfe:|Kategorie:|Portal:|Vorlage:|Spezial:)/i.test(t))
+    .filter(t => !/\(Begriffsklärung\)/i.test(t));
+  linkCache.set(title, all);
+  return all;
+}
+
+async function fetchSummary(title){
+  title = normTitle(title);
+  if(summaryCache.has(title)) return summaryCache.get(title);
+  try{
+    const data = await fetch(SUMMARY + encodeURIComponent(title.replaceAll(" ","_"))).then(r=>r.json());
+    const res = {
+      title: data.title || title,
+      extract: data.extract || "Keine Kurzbeschreibung gefunden.",
+      image: data.thumbnail?.source || data.originalimage?.source || "",
+      url: data.content_urls?.desktop?.page || wikiUrl(title)
+    };
+    summaryCache.set(title, res);
+    return res;
+  }catch(e){
+    const res = {title, extract:"Keine Kurzbeschreibung gefunden.", image:"", url:wikiUrl(title)};
+    summaryCache.set(title, res);
+    return res;
+  }
+}
+
+function addNode(title, parent=null, depth=0){
+  const id = idFromTitle(title);
+  if(nodeMap.has(id)) return nodeMap.get(id);
+  const color = depth === 0 ? "#111111" : hashColor(title);
+  const angle = Math.random() * Math.PI * 2;
+  const radius = parent ? (130 + Math.random()*260 + depth*90) : 0;
+  const baseX = parent ? parent.x + Math.cos(angle)*radius : width/2 + (Math.random()-.5)*90;
+  const baseY = parent ? parent.y + Math.sin(angle)*radius : height/2 + (Math.random()-.5)*70;
+  const n = {
+    id, title:normTitle(title), color, depth,
+    radius: depth===0 ? 18 : (depth===1 ? 10.5 : 8.5),
+    x: baseX, y: baseY,
+    expanded:false,
+    degree:0
+  };
+  nodes.push(n);
+  nodeMap.set(id,n);
+  return n;
+}
+
+function addLink(sourceTitle, targetTitle, type="primary"){
+  const sid = idFromTitle(sourceTitle), tid = idFromTitle(targetTitle);
+  if(sid === tid) return;
+  if(links.some(l => (l.source.id||l.source)===sid && (l.target.id||l.target)===tid && l.type===type)) return;
+  links.push({source:sid,target:tid,type});
+  const s=nodeMap.get(sid), t=nodeMap.get(tid);
+  if(s) s.degree++;
+  if(t) t.degree++;
+}
+
+function importantSubset(title, arr, max=54){
+  const lower = title.toLowerCase();
+  const scored = arr.map(t => {
+    let score = 0;
+    if(keywordColors.some(k=>k.rx.test(t))) score += 4;
+    if(t.length < 24) score += 2;
+    if(t.toLowerCase().includes(lower)) score += 1;
+    if(/chem|bio|phys|mathe|geschichte|technik|kunst|informatik|atom|molekül|stoff|reaktion|element/i.test(t)) score += 3;
+    score += Math.random()*1.5;
+    return {t,score};
+  }).sort((a,b)=>b.score-a.score);
+  return scored.slice(0,max).map(x=>x.t);
+}
+
+async function searchRoot(title){
+  title = normTitle(title);
+  if(!title) return;
+  nodes = []; links = []; nodeMap = new Map(); selected = null;
+  linkCache.clear(); summaryCache.clear();
+  setStatus("Lade Wikipedia-Links …", 4000);
+  const root = addNode(title,null,0);
+  selected = root;
+  const arr = await fetchLinks(title);
+  const subset = importantSubset(title, arr, 58);
+  subset.forEach(t => {
+    addNode(t, root, 1);
+    addLink(title, t, "primary");
+  });
+  root.expanded = true;
+  updateSimulation();
+  render();
+  fitSoon();
+  await addCrossLinksForVisible(root.title, subset);
+  render();
+  setStatus(`${subset.length} Artikel geladen`);
+  showPanel(root);
+}
+
+async function expandNode(node){
+  if(!node) return false;
+  setStatus("Erweitere: " + node.title, 4000);
+  const arr = await fetchLinks(node.title);
+  const subset = importantSubset(node.title, arr, node.depth < 2 ? 38 : 24);
+  subset.forEach(t => {
+    const child = addNode(t, node, Math.min(node.depth+1, 4));
+    addLink(node.title, child.title, "primary");
+  });
+  node.expanded = true;
+  updateSimulation();
+  render();
+  await addCrossLinksForVisible(node.title, subset);
+  render();
+  setStatus("Erweitert: " + node.title);
+  return true;
+}
+
+async function addCrossLinksForVisible(sourceTitle, newTitles){
+  
+  const visibleTitles = nodes.map(n=>n.title);
+  const candidates = nodes.filter(n=>n.depth > 0).slice(0, 95);
+  const sample = candidates
+    .sort((a,b)=> (b.degree-a.degree) + Math.random()*.2)
+    .slice(0, Math.min(28, candidates.length));
+  let added = 0;
+  for(const n of sample){
+    try{
+      const ls = await fetchLinks(n.title);
+      const set = new Set(ls.map(idFromTitle));
+      for(const other of candidates){
+        if(added > 70) break;
+        if(other.id === n.id) continue;
+        if(set.has(other.id)){
+          addLink(n.title, other.title, "cross");
+          added++;
+        }
+      }
+    }catch(e){}
+  }
+  updateSimulation(false);
+}
+
+function updateSimulation(reheat=true){
+  if(simulation) simulation.stop();
+  simulation = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links)
+      .id(d=>d.id)
+      .distance(d => d.type==="cross" ? 170 + Math.random()*90 : 210 + Math.random()*210)
+      .strength(d => d.type==="cross" ? 0.025 : 0.12))
+    .force("charge", d3.forceManyBody()
+      .strength(d => d.depth===0 ? -1150 : -560 - d.degree*22))
+    .force("collide", d3.forceCollide()
+      .radius(d => 52 + Math.min(36, d.title.length*1.25))
+      .strength(1))
+    .force("x", d3.forceX(width/2).strength(d => d.depth===0 ? .035 : .010))
+    .force("y", d3.forceY(height/2).strength(d => d.depth===0 ? .035 : .010))
+    .force("radial", d3.forceRadial(d => d.depth===0 ? 0 : 260 + d.depth*180 + Math.random()*120, width/2, height/2).strength(.018))
+    .alphaDecay(.028)
+    .velocityDecay(.43)
+    .on("tick", ticked);
+  if(reheat) simulation.alpha(0.95).restart();
+}
+
+function render(){
+  lblCount.textContent = `${nodes.length} Knoten · ${links.length} Linien`;
+
+  const visibleLinks = links;
+  const link = linkLayer.selectAll("path")
+    .data(visibleLinks, d => `${d.source.id||d.source}->${d.target.id||d.target}:${d.type}`);
+
+  link.exit().remove();
+
+  link.enter().append("path")
+    .attr("class", d => "link " + (d.type === "cross" ? "cross" : "primary"))
+    .merge(link)
+    .attr("stroke", edgeColor);
+
+  const node = nodeLayer.selectAll("g.node")
+    .data(nodes, d => d.id);
+
+  node.exit().remove();
+
+  const enter = node.enter().append("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended));
+
+  enter.append("circle").attr("class","halo");
+  enter.append("circle").attr("class","mainCircle");
+  enter.append("text")
+    .attr("text-anchor","middle")
+    .attr("dy", d => d.depth===0 ? -24 : -16);
+
+  enter
+    .on("click", (event,d) => {
+      selected=d;
+      render();
+      renderFocus(d);
+      showPanel(d);
+      // Auswahl bleibt stabil, bis ein anderer Knoten gewählt oder neu gesucht wird.
+    })
+    .on("dblclick", async (event,d) => { event.stopPropagation(); await expandNode(d); })
+    .on("mouseenter", (event,d)=>showTooltip(event,d))
+    .on("mousemove", moveTooltip)
+    .on("mouseleave", hideTooltip);
+
+  const merged = enter.merge(node);
+  merged
+    .attr("class", d => `node ${d.depth===0?'root':''} ${d.depth>1?'secondary':''} ${d.expanded?'expanded':''} ${selected?.id===d.id?'focused selectedHalo':''}`)
+    .select("circle.mainCircle")
+    .attr("r", d => Math.min(24, d.radius + Math.sqrt(Math.max(0,d.degree))*1.7))
+    .attr("fill", d => d.color);
+
+  merged.select("circle.halo")
+    .attr("r", d => Math.min(56, (d.radius + Math.sqrt(Math.max(0,d.degree))*1.7) + 24));
+
+  merged.select("text")
+    .text(d => d.title.length > 30 ? d.title.slice(0,28)+"…" : d.title);
+
+  ticked();
+}
+
+function ticked(){
+  linkLayer.selectAll("path").attr("d", d => {
+    const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
+    const dx = tx-sx, dy = ty-sy;
+    const dr = Math.sqrt(dx*dx+dy*dy) * (d.type==="cross" ? 1.8 : 1.25);
+    return `M${sx},${sy}Q${(sx+tx)/2 + dy*0.06},${(sy+ty)/2 - dx*0.06} ${tx},${ty}`;
+  });
+  nodeLayer.selectAll("g.node").attr("transform", d => `translate(${d.x},${d.y})`);
+}
+
+function dragstarted(event,d){
+  d3.select(this).classed("dragging", true);
+  if(!event.active) simulation.alphaTarget(0.22).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event,d){
+  d.fx = event.x; d.fy = event.y;
+}
+function dragended(event,d){
+  d3.select(this).classed("dragging", false);
+  if(!event.active) simulation.alphaTarget(0);
+
+  // automatisch nach kurzer Zeit wieder freigeben
+  setTimeout(()=>{
+    d.fx=null;
+    d.fy=null;
+    if(simulation) simulation.alpha(.35).restart();
+  },4500);
+}
+
+function showTooltip(event,d){
+  tooltip.innerHTML = `<b>${d.title}</b><br>${d.expanded ? "Bereits erweitert" : "Doppelklick: Artikel erweitern"}<br>Ziehen: Knoten verschieben`;
+  tooltip.style.display = "block";
+  moveTooltip(event);
+}
+function moveTooltip(event){
+  tooltip.style.left = (event.clientX + 12) + "px";
+  tooltip.style.top = (event.clientY + 12) + "px";
+}
+function hideTooltip(){ tooltip.style.display = "none"; }
+
+async function showPanel(d){
+  selected = d;
+  sidePanel.style.display = "block";
+  panelContent.innerHTML = `<h3>${d.title}</h3><p>Lade Vorschau …</p>`;
+  const s = await fetchSummary(d.title);
+  if(d.expanded && !linkCache.has(d.title)){
+    await fetchLinks(d.title);
+  }
+  const linksForNode = linkCache.get(d.title) || [];
+  const img = s.image ? `<img class="preview-img" src="${s.image}" alt="${s.title}">` : `<div class="preview-img" style="display:flex;align-items:center;justify-content:center;color:#555;">Kein Bild verfügbar</div>`;
+  panelContent.innerHTML = `
+    <h3>${s.title}</h3>
+    ${img}
+    <p>${s.extract}</p>
+    <div class="panel-actions">
+      <a class="wiki-main" href="${s.url}" target="_blank" rel="noopener">Wikipedia öffnen</a>
+      <button id="panelExpand">Diesen Artikel im Netzwerk erweitern</button>
+    </div>
+    <div class="panel-note">Fokus und Knotenfreigabe liegen jetzt oben in der Hauptleiste, damit das rechte Panel nur Vorschau und Artikelinformationen zeigt.</div>
+    <div class="linkList">
+      <h4>Direkte blaue Links <span style="font-weight:400;font-size:12px;">(${linksForNode.length || 0})</span></h4>
+      <p style="font-size:12px;margin:0 0 8px 0;">● bereits im Graph sichtbar · ○ noch nicht sichtbar</p>
+      <input id="linkFilter" placeholder="Links filtern..." style="width:100%;padding:8px;border-radius:8px;border:1px solid #666;margin-bottom:8px">
+      <div id="linkContainer">
+      ${linksForNode.length 
+        ? linksForNode.slice(0,120).map(x=>`<a href="#" class="${nodeMap.has(idFromTitle(x)) ? 'visibleInGraph' : ''}" data-title="${escapeAttr(x)}">${x}</a>`).join("")
+        : "<p>Noch keine Linkliste geladen. Klicke oben auf „Artikel erweitern“ oder rechts auf „Diesen Artikel im Netzwerk erweitern“.</p>"}
+      </div>
+      ${linksForNode.length > 120 ? `<p style="font-size:12px;margin-top:8px;">Es werden die ersten 120 Links angezeigt. Nutze das Filterfeld für gezieltes Suchen.</p>` : ""}
+    </div>
+  `;
+  document.getElementById("panelExpand").onclick = async ()=>{
+    await expandNode(d);
+    await showPanel(d);
+    render();
+    if(selected) renderFocus(selected);
+  };
+  const filter=document.getElementById("linkFilter");
+  if(filter){
+    filter.oninput=(e)=>{
+      const q=e.target.value.toLowerCase();
+      panelContent.querySelectorAll(".linkList a").forEach(el=>{
+        el.style.display=el.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    }
+  }
+
+  panelContent.querySelectorAll(".linkList a").forEach(a=>{
+    a.onclick = async (ev)=>{
+      ev.preventDefault();
+      const t=a.getAttribute("data-title");
+      const n = addNode(t,d,Math.min(d.depth+1,4));
+      addLink(d.title,n.title,"primary");
+      selected = n;
+      updateSimulation();
+      render();
+      renderFocus(n);
+      fitView();
+      showPanel(n);
+    };
+  });
+}
+
+function escapeAttr(s){
+  return String(s).replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("<","&lt;");
+}
+
+function renderFocus(d){
+  nodeLayer.selectAll(".node")
+    .classed("dim", false)
+    .classed("neighborPrimary", false)
+    .classed("neighborCross", false);
+
+  linkLayer.selectAll(".link")
+    .classed("dim", false)
+    .classed("activePrimary", false)
+    .classed("activeCross", false);
+
+  if(!d){ return; }
+
+  const primaryNeighbors = new Set();
+  const crossNeighbors = new Set();
+  const allNeighbors = new Set([d.id]);
+
+  links.forEach(l=>{
+    const s=l.source.id||l.source;
+    const t=l.target.id||l.target;
+    const connected = (s===d.id || t===d.id);
+    if(!connected) return;
+    const other = s===d.id ? t : s;
+    allNeighbors.add(other);
+    if(l.type === "cross") crossNeighbors.add(other);
+    else primaryNeighbors.add(other);
+  });
+
+  linkLayer.selectAll(".link")
+    .classed("dim", l => {
+      const s=l.source.id||l.source, t=l.target.id||l.target;
+      return !(s===d.id || t===d.id);
+    })
+    .classed("activePrimary", l => {
+      const s=l.source.id||l.source, t=l.target.id||l.target;
+      return l.type !== "cross" && (s===d.id || t===d.id);
+    })
+    .classed("activeCross", l => {
+      const s=l.source.id||l.source, t=l.target.id||l.target;
+      return l.type === "cross" && (s===d.id || t===d.id);
+    });
+
+  nodeLayer.selectAll(".node")
+    .classed("dim", n => !allNeighbors.has(n.id))
+    .classed("neighborPrimary", n => primaryNeighbors.has(n.id))
+    .classed("neighborCross", n => !primaryNeighbors.has(n.id) && crossNeighbors.has(n.id));
+}
+
+function fitSoon(){ setTimeout(fitView, 500); setTimeout(fitView, 1400); }
+function fitView(){
+  if(!nodes.length) return;
+  const xs = nodes.map(n=>n.x), ys = nodes.map(n=>n.y);
+  const minX=Math.min(...xs)-120, maxX=Math.max(...xs)+120;
+  const minY=Math.min(...ys)-120, maxY=Math.max(...ys)+120;
+  const w=maxX-minX, h=maxY-minY;
+  const scale=Math.max(.16, Math.min(1.4, .88/Math.max(w/width,h/height)));
+  const tx=width/2 - scale*(minX+w/2);
+  const ty=height/2 - scale*(minY+h/2);
+  svg.transition().duration(650).call(zoom.transform, d3.zoomIdentity.translate(tx,ty).scale(scale));
+}
+
+function spread(){
+  nodes.forEach(n=>{
+    if(n.depth>0 && !n.fx){
+      const dx=n.x-width/2, dy=n.y-height/2;
+      const len=Math.sqrt(dx*dx+dy*dy)||1;
+      n.vx += dx/len * (6 + Math.random()*8);
+      n.vy += dy/len * (6 + Math.random()*8);
+    }
+  });
+  simulation.force("charge").strength(d => d.depth===0 ? -1500 : -820 - d.degree*28);
+  simulation.force("collide").radius(d => 70 + Math.min(50, d.title.length*1.35)).strength(1);
+  simulation.alpha(.95).restart();
+  setTimeout(()=>{
+    simulation.force("charge").strength(d => d.depth===0 ? -1150 : -560 - d.degree*22);
+    simulation.force("collide").radius(d => 52 + Math.min(36, d.title.length*1.25)).strength(1);
+    simulation.alpha(.35).restart();
+  }, 2000);
+}
+
+function calm(){
+  if(simulation){
+    simulation.alphaTarget(0);
+    simulation.velocityDecay(.68);
+    setTimeout(()=>simulation.stop(), 900);
+  }
+}
+
+document.getElementById("btnSearch").onclick = ()=>searchRoot(document.getElementById("txtSearch").value);
+document.getElementById("txtSearch").addEventListener("keydown", e=>{
+  if(e.key==="Enter") searchRoot(e.target.value);
+});
+document.getElementById("btnExpand").onclick = async ()=>{
+  if(!selected) return;
+  await expandNode(selected);
+  await showPanel(selected);
+  render();
+  renderFocus(selected);
+};
+document.getElementById("btnShowAll").onclick = ()=>{
+  renderFocus(null);
+  fitView();
+  setStatus("Gesamte Mindmap sichtbar");
+};
+document.getElementById("btnFit").onclick = fitView;
+document.getElementById("btnClosePanel").onclick = ()=>sidePanel.style.display="none";
+
+window.addEventListener("resize", ()=>{
+  width = window.innerWidth;
+  height = window.innerHeight;
+  if(simulation){
+    simulation.force("x", d3.forceX(width/2).strength(d => d.depth===0 ? .035 : .010));
+    simulation.force("y", d3.forceY(height/2).strength(d => d.depth===0 ? .035 : .010));
+    simulation.force("radial", d3.forceRadial(d => d.depth===0 ? 0 : 260 + d.depth*180 + Math.random()*120, width/2, height/2).strength(.018));
+    simulation.alpha(.35).restart();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
